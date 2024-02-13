@@ -1,0 +1,41 @@
+/* src/components/HomePage.css */
+
+.chat-container {
+    display: flex;
+    height: 100vh; /* Full height of the viewport */
+  }
+  
+  .user-list {
+    width: 20vw;
+    flex: 1;
+    overflow-y: auto; /* Allows scrolling if many users */
+    border-right: 2px solid #ccc; /* Separator between user list and chat */
+    padding: 10px;
+  }
+  
+  .user-item {
+    cursor: pointer;
+    padding: 10px;
+    border-bottom: 1px solid #eee; /* Separates users visually */
+  }
+  
+  .chat-interface {
+    flex: 3; /* Gives more space to the chat interface */
+    padding: 20px;
+  }
+
+  
+  /* Add to src/components/HomePage.css */
+
+.messages {
+    margin-bottom: 20px;
+    overflow-y: auto;
+  }
+  
+  .message {
+    background-color: #f1f1f1;
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 5px;
+  }
+  
