@@ -62,7 +62,7 @@ function Login() {
     <div style={{"width":"100vw"}}>
     <form onSubmit={handleSubmit} style={formStyle}>
       <div>
-        <label htmlFor="username">Username:</label>
+        <label htmlFor="username">Email:</label>
         <input
           type="text"
           id="username"
