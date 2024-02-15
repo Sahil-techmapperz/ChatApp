@@ -13,7 +13,8 @@ function Login() {
     event.preventDefault();
 
     try {
-      const response = await axios.post(`${BaseUrl}/api/user/login`, {
+      const response = await axios.post('https://chatdb-161w.onrender.com/api/user/login', {
+
         email: username,
         password,
       });
@@ -64,7 +65,7 @@ function Login() {
     <div style={{"width":"100vw"}}>
     <form onSubmit={handleSubmit} style={formStyle}>
       <div>
-        <label htmlFor="username">Username:</label>
+        <label htmlFor="username">Email:</label>
         <input
           type="text"
           id="username"
