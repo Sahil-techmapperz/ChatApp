@@ -6,6 +6,7 @@ import Login from './components/Login';
 // Import other components
 import HomePage from './components/HomePage'; // Assume you have a HomePage component
 import ProtectedRoute from './components/ProtectedRoute';
+import Singup from './components/Singup';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <div className="App">
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Singup />} />
           <Route path="/" element={
             <ProtectedRoute>
               <HomePage />
