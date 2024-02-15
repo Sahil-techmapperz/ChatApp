@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sound from "../assets/whatsapp_notification.mp3";
 import { FiCircle, FiMail } from "react-icons/fi"; // Using FiMail for unread messages
 import Avatardefault from "../assets/avatar-default.png";
+import { MdExitToApp } from 'react-icons/md';
 
 function UsersList({ onSelectUser, socket,messages,selectedUser }) {
   const [users, setUsers] = useState([]);
@@ -54,6 +55,13 @@ function UsersList({ onSelectUser, socket,messages,selectedUser }) {
     onSelectUser(user);
   };
 
+
+  function logout() {
+    localStorage.removeItem('user');
+    window.location.href = '/login'; 
+}
+
+
   return (
     <div className="user-list" style={{ maxWidth: '400px', overflow: 'hidden', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', margin: '0 auto', padding: '10px' }}>
       {loginUser && (
@@ -71,6 +79,9 @@ function UsersList({ onSelectUser, socket,messages,selectedUser }) {
           <div style={{ marginLeft: '10px', fontWeight: 'bold', fontSize: '1.2rem', color: '#333' }}>
             {loginUser.name}
           </div>
+          <button onClick={logout} style={{ cursor: 'pointer', background: 'none', border: 'none' }}>
+            <MdExitToApp size="24px" title="Logout" />
+        </button>
         </div>
       )}
       {error && <p style={{ color: 'red' }}>{error}</p>}

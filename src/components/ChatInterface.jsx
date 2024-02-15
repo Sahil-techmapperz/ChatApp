@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import chatBackground from '../assets/chatBG.jpg';
-import { MdEdit, MdDelete, MdImage, MdAttachFile, MdFileDownload } from "react-icons/md";
+import React, { useEffect, useRef, useState } from 'react';
+import { MdEdit, MdDelete, MdImage, MdAttachFile, MdFileDownload, MdInsertEmoticon } from "react-icons/md"; // Add MdInsertEmoticon for the emoji icon
+import EmojiPicker from 'emoji-picker-react';
 
 function ChatInterface({ socket, selectedUser, messages, message, setMessage, handleSendMessage, handleEditMessage, handleDeleteMessage }) {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -8,10 +8,13 @@ function ChatInterface({ socket, selectedUser, messages, message, setMessage, ha
     const [editedContent, setEditedContent] = useState("");
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
     // Additional state to handle file inputs
     const [image, setImage] = useState(null);
     const [file, setFile] = useState(null);
+
+    const emojiPickerRef = useRef(null);
 
     let BaseUrl = import.meta.env.VITE_Base_Url;
 
@@ -19,6 +22,22 @@ function ChatInterface({ socket, selectedUser, messages, message, setMessage, ha
 
     const fileInputStyle = {
         display: 'none'
+    };
+
+
+
+    // New function to handle emoji selection
+    const onEmojiClick = (event, emojiObject) => {
+        console.log(emojiObject);
+        let fileUrl = emojiObject.srcElement.src;
+        // setImage(prevMessage => prevMessage + emojiObject.srcElement.src); 
+        setShowEmojiPicker(false);
+        socket.emit("newfile", { 'fileUrl': fileUrl, fileType: "emoji", "receiverId": selectedUser._id, 'senderId': user._id });
+    };
+
+    // Toggle function for the emoji picker
+    const toggleEmojiPicker = () => {
+        setShowEmojiPicker(!showEmojiPicker);
     };
 
     // Function to trigger file input
@@ -29,8 +48,8 @@ function ChatInterface({ socket, selectedUser, messages, message, setMessage, ha
     // Function to handle file selection
     const handleFileChange = (event, type) => {
         const selectedFile = event.target.files[0];
-            setFile(selectedFile);
-            document.getElementById("file").style.display="block";
+        setFile(selectedFile);
+        document.getElementById("file").style.display = "block";
     };
 
     // Function to handle file upload
@@ -47,10 +66,10 @@ function ChatInterface({ socket, selectedUser, messages, message, setMessage, ha
 
         // Reset file input after upload
         if (type === 'image') {
-            document.getElementById('image').value="";
+            document.getElementById('image').value = "";
             setImage(null);
         } else {
-            document.getElementById('file').value="";
+            document.getElementById('file').value = "";
             setFile(null);
         }
     };
@@ -125,12 +144,12 @@ function ChatInterface({ socket, selectedUser, messages, message, setMessage, ha
             let fileType = getFileTypeFromUrl(fileUrl);
             console.log(fileType);
             setIsLoading(false);
-            document.getElementById("file").style.display="none";
+            document.getElementById("file").style.display = "none";
             socket.emit("newfile", { 'fileUrl': fileUrl, fileType, "receiverId": selectedUser._id, 'senderId': user._id });
         } catch (error) {
             console.error('Upload failed:', error);
             setIsLoading(false);
-            document.getElementById("file").style.display="none";
+            document.getElementById("file").style.display = "none";
         }
     }
 
@@ -178,8 +197,7 @@ function ChatInterface({ socket, selectedUser, messages, message, setMessage, ha
         marginBottom: '20px',
         border: '1px solid #ddd',
         borderRadius: '4px',
-        backgroundColor: '#f9f9f9',
-        backgroundImage: `url(${chatBackground})`,
+        backgroundColor: '#e3f2fd',
         backgroundSize: 'cover',
     };
 
@@ -332,6 +350,48 @@ function ChatInterface({ socket, selectedUser, messages, message, setMessage, ha
         setEditedContent("");
     };
 
+
+    // Style for the emoji picker container to center it
+    const emojiPickerStyle = {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 1000, // Ensure it's above other content
+        border: '1px solid #ccc',
+        borderRadius: '10px',
+        backgroundColor: 'white',
+        padding: '20px',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    };
+
+    // Overlay style
+    const overlayStyle = {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        zIndex: 999, // Just below the emoji picker
+    };
+
+
+    // Click outside handler
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
+                setShowEmojiPicker(false);
+            }
+        }
+        // Bind the event listener
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            // Unbind the event listener on clean up
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [emojiPickerRef]);
+
     return (
         <div style={chatInterfaceStyle}>
             {selectedUser && <h2 style={headingStyle}>Chat with {selectedUser.name}</h2>}
@@ -348,13 +408,13 @@ function ChatInterface({ socket, selectedUser, messages, message, setMessage, ha
                             {msg.fileUrl && msg.fileUrl.trim() !== "" ? (
                                 // Rendering for messages with files
                                 <>
-                                    {msg.fileType.startsWith("image") ? (
+                                    {msg.fileType.startsWith("image") || msg.fileType.startsWith("emoji") ? (
                                         <div>
                                             <img src={msg.fileUrl} alt="Sent" style={{ maxWidth: '100%', height: 'auto' }} />
                                             {/* Download button for the image */}
-                                            <a href={msg.fileUrl} download={true} target='_blank' style={{ cursor: 'pointer', marginLeft: '10px' }}>
+                                            {msg.fileType != "emoji" && <a href={msg.fileUrl} download={true} target='_blank' style={{ cursor: 'pointer', marginLeft: '10px' }}>
                                                 <MdFileDownload size="20px" title="Download Image" />
-                                            </a>
+                                            </a>}
                                         </div>
 
                                     ) : msg.fileType.startsWith("audio") ? (
@@ -429,7 +489,15 @@ function ChatInterface({ socket, selectedUser, messages, message, setMessage, ha
                     Send
                 </button>
                 <MdAttachFile onClick={() => triggerFileInput('file')} style={{ cursor: 'pointer', marginLeft: '10px' }} />
-                
+                <MdInsertEmoticon onClick={toggleEmojiPicker} style={{ cursor: 'pointer', marginLeft: '10px' }} />
+                {showEmojiPicker && (
+                    <div style={overlayStyle} onClick={() => setShowEmojiPicker(false)}>
+                        <div style={emojiPickerStyle} ref={emojiPickerRef}>
+                            <EmojiPicker onEmojiClick={onEmojiClick} />
+                            <button onClick={() => setShowEmojiPicker(false)} style={{ marginTop: '10px' }}>Cancel</button>
+                        </div>
+                    </div>
+                )}
                 <input
                     id="file"
                     type="file"
