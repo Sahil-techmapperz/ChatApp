@@ -1,12 +1,148 @@
 import React, { useState } from 'react';
 import chatBackground from '../assets/chatBG.jpg';
-import { MdEdit, MdDelete } from "react-icons/md";
+import { MdEdit, MdDelete, MdImage, MdAttachFile, MdFileDownload } from "react-icons/md";
 
-function ChatInterface({ selectedUser, messages, message, setMessage, handleSendMessage, handleEditMessage, handleDeleteMessage }) {
+function ChatInterface({ socket, selectedUser, messages, message, setMessage, handleSendMessage, handleEditMessage, handleDeleteMessage }) {
     const user = JSON.parse(localStorage.getItem('user'));
     const [editingMessageId, setEditingMessageId] = useState(null);
     const [editedContent, setEditedContent] = useState("");
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Additional state to handle file inputs
+    const [image, setImage] = useState(null);
+    const [file, setFile] = useState(null);
+
+    let BaseUrl = import.meta.env.VITE_Base_Url;
+
+    // Inline styles omitted for brevity...
+
+    const fileInputStyle = {
+        display: 'none'
+    };
+
+    // Function to trigger file input
+    const triggerFileInput = (fileType) => {
+        document.getElementById(fileType).click();
+    };
+
+    // Function to handle file selection
+    const handleFileChange = (event, type) => {
+        const selectedFile = event.target.files[0];
+            setFile(selectedFile);
+            document.getElementById("file").style.display="block";
+    };
+
+    // Function to handle file upload
+    const uploadFile = (type) => {
+        const formData = new FormData();
+        formData.append(type, type === 'image' ? image : file);
+        setIsLoading(true);
+
+        if (type == "image") {
+            handleimageUpload(formData, type);
+        } else {
+            handlefileUpload(formData, type);
+        }
+
+        // Reset file input after upload
+        if (type === 'image') {
+            document.getElementById('image').value="";
+            setImage(null);
+        } else {
+            document.getElementById('file').value="";
+            setFile(null);
+        }
+    };
+
+
+    function getFileTypeFromUrl(url) {
+        // Regular expression to extract the file extension from the URL
+        const extensionMatch = url.match(/\.([^\.]+)$/);
+        if (!extensionMatch) return 'other'; // Return 'other' if no extension found
+
+        const extension = extensionMatch[1].toLowerCase();
+
+        // Define known extensions for image, audio, and video files
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+        const audioExtensions = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'];
+        const videoExtensions = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv', 'webm'];
+
+        // Determine the file type based on the extension
+        if (imageExtensions.includes(extension)) {
+            return 'image';
+        } else if (audioExtensions.includes(extension)) {
+            return 'audio';
+        } else if (videoExtensions.includes(extension)) {
+            return 'video';
+        } else {
+            return 'other';
+        }
+    }
+
+
+    async function handleimageUpload(formData, type) {
+        try {
+            const response = await fetch(`${BaseUrl}/chatmessage/uploadimage`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server responded with ${response.status}`);
+            }
+            const result = await response.json();
+            let fileUrl = result.Url;
+
+            let fileType = getFileTypeFromUrl(fileUrl);
+            console.log(fileType);
+            setIsLoading(false);
+            socket.emit("newfile", { 'fileUrl': fileUrl, fileType, "receiverId": selectedUser._id, 'senderId': user._id });
+        } catch (error) {
+            console.error('Upload failed:', error);
+            alert('Failed to upload file.');
+        }
+    };
+
+
+
+
+
+    async function handlefileUpload(formData, type) {
+        try {
+            const response = await fetch(`${BaseUrl}/api/chatmessage/uploadfile`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server responded with ${response.status}`);
+            }
+
+            const result = await response.json();
+            let fileUrl = result.Url;
+
+            let fileType = getFileTypeFromUrl(fileUrl);
+            console.log(fileType);
+            setIsLoading(false);
+            document.getElementById("file").style.display="none";
+            socket.emit("newfile", { 'fileUrl': fileUrl, fileType, "receiverId": selectedUser._id, 'senderId': user._id });
+        } catch (error) {
+            console.error('Upload failed:', error);
+            setIsLoading(false);
+            document.getElementById("file").style.display="none";
+        }
+    }
+
+
+    const enhancedHandleSendMessage = () => {
+        if (image || file) {
+            uploadFile(image ? 'image' : 'file');
+        } else {
+            handleSendMessage();
+        }
+    };
+
 
     // Inline styles
     const chatInterfaceStyle = {
@@ -46,6 +182,32 @@ function ChatInterface({ selectedUser, messages, message, setMessage, handleSend
         backgroundImage: `url(${chatBackground})`,
         backgroundSize: 'cover',
     };
+
+    const spinnerInnerStyle = {
+        border: '4px solid rgba(0, 0, 0, 0.1)',
+        borderTopColor: '#3498db', // Example color
+        borderRadius: '50%',
+        width: '40px',
+        height: '40px',
+        animation: 'spin 1s linear infinite',
+    };
+
+
+    const spinnerStyle = {
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'absolute', // Positioning it absolutely to overlay on the messages or at a fixed place.
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'transparent', // Semi-transparent background
+    };
+
+
+
+
 
     const messageStyle = {
         maxWidth: "60%",
@@ -130,6 +292,11 @@ function ChatInterface({ selectedUser, messages, message, setMessage, handleSend
         backgroundColor: '#F44336',
         color: 'white',
     };
+    const downloadButtonStyle = {
+        ...actionButtonStyle,
+        backgroundColor: '#F44336',
+        color: 'white',
+    };
 
 
     // New function to handle mouse enter and leave
@@ -170,34 +337,57 @@ function ChatInterface({ selectedUser, messages, message, setMessage, handleSend
             {selectedUser && <h2 style={headingStyle}>Chat with {selectedUser.name}</h2>}
             <div style={messagesStyle}>
                 {messages.map((msg) => (
-                    (msg.senderId === selectedUser._id && msg.receiverId === user._id) || (msg.senderId === user._id && msg.receiverId === selectedUser._id) ? (
+                    (msg.senderId === selectedUser._id && msg.receiverId === user._id) ||
+                        (msg.senderId === user._id && msg.receiverId === selectedUser._id) ? (
                         <div
                             key={msg._id}
                             style={msg.senderId === user._id ? messageStyleSent : messageStyleReceived}
                             onMouseEnter={() => handleMouseEnter(msg._id)}
                             onMouseLeave={handleMouseLeave}
                         >
-                            <div>{msg.content}</div>
-                            {/* Show "Edited" if createdAt and updatedAt are different */}
-                            {msg.isUpdate && <span style={editedLabelStyle}>(Edited){formatMessageTime(msg.updatedAt)}</span>}
+                            {msg.fileUrl && msg.fileUrl.trim() !== "" ? (
+                                // Rendering for messages with files
+                                <>
+                                    {msg.fileType.startsWith("image") ? (
+                                        <div>
+                                            <img src={msg.fileUrl} alt="Sent" style={{ maxWidth: '100%', height: 'auto' }} />
+                                            {/* Download button for the image */}
+                                            <a href={msg.fileUrl} download={true} target='_blank' style={{ cursor: 'pointer', marginLeft: '10px' }}>
+                                                <MdFileDownload size="20px" title="Download Image" />
+                                            </a>
+                                        </div>
+
+                                    ) : msg.fileType.startsWith("audio") ? (
+                                        <audio controls src={msg.fileUrl}>Your browser does not support the audio element.</audio>
+                                    ) : msg.fileType.startsWith("video") ? (
+                                        <video controls src={msg.fileUrl} style={{ maxWidth: '100%', height: 'auto' }}>Your browser does not support the video tag.</video>
+                                    ) : (
+                                        <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer">Open file</a>
+                                    )}
+                                </>
+                            ) : (
+                                // Rendering for normal text messages
+                                <>
+                                    {isLoading && (
+                                        <div style={spinnerStyle}>
+                                            <div style={spinnerInnerStyle}></div>
+                                            <div>Please wait your file is uploading</div>
+                                        </div>
+                                    )}
+
+                                    <div>{msg.content}</div>
+                                    {msg.isUpdate && <span style={editedLabelStyle}>(Edited) {formatMessageTime(msg.updatedAt)}</span>}
+                                </>
+                            )}
                             <div style={messageTimeStyle}>{formatMessageTime(msg.createdAt)}</div>
+                            {/* Read status, edit, and delete actions */}
                             {msg.senderId === user._id && (
                                 <span style={readStatusLabelStyle}>
-                                    {msg.isRead ?
-                                        <div style={{ color: "#53bdeb", textAlign: "end" }}>
-                                            <svg viewBox="0 0 16 11" height="11" width="16" preserveAspectRatio="xMidYMid meet" class="" fill="none"><title>msg-dblcheck</title><path d="M11.0714 0.652832C10.991 0.585124 10.8894 0.55127 10.7667 0.55127C10.6186 0.55127 10.4916 0.610514 10.3858 0.729004L4.19688 8.36523L1.79112 6.09277C1.7488 6.04622 1.69802 6.01025 1.63877 5.98486C1.57953 5.95947 1.51817 5.94678 1.45469 5.94678C1.32351 5.94678 1.20925 5.99544 1.11192 6.09277L0.800883 6.40381C0.707784 6.49268 0.661235 6.60482 0.661235 6.74023C0.661235 6.87565 0.707784 6.98991 0.800883 7.08301L3.79698 10.0791C3.94509 10.2145 4.11224 10.2822 4.29844 10.2822C4.40424 10.2822 4.5058 10.259 4.60313 10.2124C4.70046 10.1659 4.78086 10.1003 4.84434 10.0156L11.4903 1.59863C11.5623 1.5013 11.5982 1.40186 11.5982 1.30029C11.5982 1.14372 11.5348 1.01888 11.4078 0.925781L11.0714 0.652832ZM8.6212 8.32715C8.43077 8.20866 8.2488 8.09017 8.0753 7.97168C7.99489 7.89128 7.8891 7.85107 7.75791 7.85107C7.6098 7.85107 7.4892 7.90397 7.3961 8.00977L7.10411 8.33984C7.01947 8.43717 6.97715 8.54508 6.97715 8.66357C6.97715 8.79476 7.0237 8.90902 7.1168 9.00635L8.1959 10.0791C8.33132 10.2145 8.49636 10.2822 8.69102 10.2822C8.79681 10.2822 8.89838 10.259 8.99571 10.2124C9.09304 10.1659 9.17556 10.1003 9.24327 10.0156L15.8639 1.62402C15.9358 1.53939 15.9718 1.43994 15.9718 1.32568C15.9718 1.1818 15.9125 1.05697 15.794 0.951172L15.4386 0.678223C15.3582 0.610514 15.2587 0.57666 15.1402 0.57666C14.9964 0.57666 14.8715 0.635905 14.7657 0.754395L8.6212 8.32715Z" fill="currentColor"></path></svg>
-                                        </div>
-                                        :
-                                        <div style={{ textAlign: "end" }}>
-                                            <svg viewBox="0 0 16 11" height="11" width="16" preserveAspectRatio="xMidYMid meet" class="" fill="none"><title>msg-dblcheck</title><path d="M11.0714 0.652832C10.991 0.585124 10.8894 0.55127 10.7667 0.55127C10.6186 0.55127 10.4916 0.610514 10.3858 0.729004L4.19688 8.36523L1.79112 6.09277C1.7488 6.04622 1.69802 6.01025 1.63877 5.98486C1.57953 5.95947 1.51817 5.94678 1.45469 5.94678C1.32351 5.94678 1.20925 5.99544 1.11192 6.09277L0.800883 6.40381C0.707784 6.49268 0.661235 6.60482 0.661235 6.74023C0.661235 6.87565 0.707784 6.98991 0.800883 7.08301L3.79698 10.0791C3.94509 10.2145 4.11224 10.2822 4.29844 10.2822C4.40424 10.2822 4.5058 10.259 4.60313 10.2124C4.70046 10.1659 4.78086 10.1003 4.84434 10.0156L11.4903 1.59863C11.5623 1.5013 11.5982 1.40186 11.5982 1.30029C11.5982 1.14372 11.5348 1.01888 11.4078 0.925781L11.0714 0.652832ZM8.6212 8.32715C8.43077 8.20866 8.2488 8.09017 8.0753 7.97168C7.99489 7.89128 7.8891 7.85107 7.75791 7.85107C7.6098 7.85107 7.4892 7.90397 7.3961 8.00977L7.10411 8.33984C7.01947 8.43717 6.97715 8.54508 6.97715 8.66357C6.97715 8.79476 7.0237 8.90902 7.1168 9.00635L8.1959 10.0791C8.33132 10.2145 8.49636 10.2822 8.69102 10.2822C8.79681 10.2822 8.89838 10.259 8.99571 10.2124C9.09304 10.1659 9.17556 10.1003 9.24327 10.0156L15.8639 1.62402C15.9358 1.53939 15.9718 1.43994 15.9718 1.32568C15.9718 1.1818 15.9125 1.05697 15.794 0.951172L15.4386 0.678223C15.3582 0.610514 15.2587 0.57666 15.1402 0.57666C14.9964 0.57666 14.8715 0.635905 14.7657 0.754395L8.6212 8.32715Z" fill="currentColor"></path></svg>
-                                        </div>
-                                    }
+                                    {msg.isRead ? "Read" : "Unread"}
                                 </span>
                             )}
-
                             {msg.senderId === user._id && hoveredMessageId === msg._id && (
                                 <div>
-                                    {/* Edit and delete buttons */}
                                     {editingMessageId === msg._id ? (
                                         <>
                                             <input
@@ -211,7 +401,7 @@ function ChatInterface({ selectedUser, messages, message, setMessage, handleSend
                                         </>
                                     ) : (
                                         <>
-                                            <button style={editButtonStyle} onClick={() => startEdit(msg)}><MdEdit /></button>
+                                            {msg.fileUrl && msg.fileUrl.trim() !== "" ? "" : <button style={editButtonStyle} onClick={() => startEdit(msg)}><MdEdit /></button>}
                                             <button style={deleteButtonStyle} onClick={() => handleDeleteMessage(msg._id)}><MdDelete /></button>
                                         </>
                                     )}
@@ -228,10 +418,31 @@ function ChatInterface({ selectedUser, messages, message, setMessage, handleSend
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     style={inputStyle}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault(); // Prevents the default action of the enter key which is to insert a new line
+                            enhancedHandleSendMessage();
+                        }
+                    }}
                 />
-                <button onClick={handleSendMessage} style={buttonStyle}>
+                <button onClick={enhancedHandleSendMessage} style={buttonStyle}>
                     Send
                 </button>
+                <MdAttachFile onClick={() => triggerFileInput('file')} style={{ cursor: 'pointer', marginLeft: '10px' }} />
+                
+                <input
+                    id="file"
+                    type="file"
+                    onChange={(e) => handleFileChange(e, 'file')}
+                    style={fileInputStyle}
+
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault(); // Prevents the default action of the enter key which is to insert a new line
+                            enhancedHandleSendMessage();
+                        }
+                    }}
+                />
             </div>
         </div>
     );

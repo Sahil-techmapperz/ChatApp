@@ -5,7 +5,9 @@ import './HomePage.css';
 import io from 'socket.io-client';
 import Sound from "../assets/whatsapp_notification.mp3";
 
-const socket = io('https://chatdb-161w.onrender.com');
+let BaseUrl = import.meta.env.VITE_Base_Url;
+const socket = io(BaseUrl);
+// const socket = io('http://localhost:7000');
 
 function HomePage() {
     const [selectedUser, setSelectedUser] = useState(null);
@@ -14,18 +16,14 @@ function HomePage() {
     const user = JSON.parse(localStorage.getItem('user'));
 
     useEffect(() => {
-        if (user && user._id) {
-            socket.emit('register', { userId: user._id });
-        }
-
-
         const audio = new Audio(Sound);
         const playSound = () => {
             audio.play().catch(error => console.log("Audio play failed:", error));
         };
 
-
-
+        if (user && user._id) {
+            socket.emit('register', { userId: user._id });
+        }
 
         socket.on('message', (newMessage) => {
             setMessages((prevMessages) => [...prevMessages, newMessage]);
@@ -36,6 +34,7 @@ function HomePage() {
         });
 
         socket.on('messages', (historicalMessages) => {
+            // console.log(historicalMessages);
             setMessages(historicalMessages);
             // Assuming marking all fetched messages as read upon receiving
             historicalMessages.forEach((msg) => {
@@ -45,11 +44,9 @@ function HomePage() {
             });
         });
 
-        // socket.on('userDataWithMessages', (updatedMessage) => {
-        //     console.log(updatedMessage);
-        // });
+
         socket.on('messageUpdated', (updatedMessage) => {
-            console.log(updatedMessage);
+            // console.log(updatedMessage);
             setMessages((prevMessages) => prevMessages.map(msg => msg._id === updatedMessage._id ? updatedMessage : msg));
         });
 
@@ -59,21 +56,7 @@ function HomePage() {
         });
 
 
-        socket.on('userDataWithMessages', (userData) => {
-            console.log(userData);
-            // const filteredUsers = userData
-            //   .filter(user => user._id !== loginUser._id)
-            //   .map(user => ({
-            //     ...user,
-            //     lastMessage: user.lastMessage !== 'empty' ? {
-            //       content: user.lastMessage.content,
-            //       createdAt: user.lastMessage.createdAt,
-            //       isRead: user.lastMessage.isRead,
-            //     } : null,
-            //     unreadCount: user.unreadCount !== 0 ? user.unreadCount : null,
-            //   }));
-            // setUsers(filteredUsers);
-          });
+
 
         return () => {
             socket.off('message');
@@ -91,7 +74,7 @@ function HomePage() {
                 senderId: user._id,
                 receiverId: selectedUser._id,
             });
-            socket.emit('getUserDataWithMessages');
+            // socket.emit('getUserDataWithMessages',{userId: user._id});
             setMessage('');
         }
     };
@@ -113,14 +96,16 @@ function HomePage() {
                 senderId: user._id,
                 receiverId: selectedUser._id,
             });
+            socket.emit('getUserDataWithMessages', { userId: user._id });
         }
     };
 
     return (
         <div className="chat-container">
-            <UsersList onSelectUser={handleSelectUser} />
+            <UsersList selectedUser={selectedUser} onSelectUser={handleSelectUser} socket={socket} messages={messages} />
             {selectedUser ? (
                 <ChatInterface
+                    socket={socket}
                     selectedUser={selectedUser}
                     messages={messages}
                     message={message}
@@ -131,8 +116,9 @@ function HomePage() {
                 />
             ) : (
                 <div className="no-user-selected">
-                    <p>Please select a user to start chatting.</p>
+                    <div>Hey there! 👋 Let's get started by choosing someone to chat with from the user list on the left.</div>
                 </div>
+
             )}
         </div>
     );
